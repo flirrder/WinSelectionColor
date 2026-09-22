@@ -13,6 +13,7 @@ namespace WinSelectionColor
         public Color HotTrackingColor { get; set; }
         public Color HilightText { get; set; }
         public Color MenuHilight { get; set; }
+        public bool SyncDwmAccent { get; set; }
 
         public SelectionColorSettings()
         {
@@ -21,6 +22,7 @@ namespace WinSelectionColor
             HotTrackingColor = Color.FromArgb(0, 102, 204);
             HilightText = Color.FromArgb(255, 255, 255);
             MenuHilight = Color.FromArgb(0, 120, 215);
+            SyncDwmAccent = false;
         }
     }
 
@@ -48,6 +50,9 @@ namespace WinSelectionColor
             uint fuFlags,
             uint uTimeout,
             out UIntPtr lpdwResult);
+
+        [DllImport("dwmapi.dll", EntryPoint = "#127", PreserveSig = false)]
+        private static extern void DwmSetColorizationColor(uint color, bool blend);
 
         private static string GetBackupFilePath()
         {
@@ -101,6 +106,18 @@ namespace WinSelectionColor
                     sw.WriteLine("HotTrackingColor=" + ToRgbString(cur.HotTrackingColor));
                     sw.WriteLine("HilightText=" + ToRgbString(cur.HilightText));
                     sw.WriteLine("MenuHilight=" + ToRgbString(cur.MenuHilight));
+
+                    // Backup DWM accent
+                    using (RegistryKey dwm = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM", false))
+                    {
+                        if (dwm != null)
+                        {
+                            object val = dwm.GetValue("ColorizationColor");
+                            if (val != null) sw.WriteLine("ColorizationColor=" + val);
+                            object acc = dwm.GetValue("AccentColor");
+                            if (acc != null) sw.WriteLine("AccentColor=" + acc);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -205,7 +222,13 @@ namespace WinSelectionColor
                 Debug.WriteLine("SetSysColors failed: " + ex.Message);
             }
 
-            // 3. Broadcast setting change notifications
+            // 3. Sync Windows DWM / Taskbar Accent Color if enabled
+            if (settings.SyncDwmAccent)
+            {
+                ApplyDwmAccentColor(settings.Hilight);
+            }
+
+            // 4. Broadcast setting change notifications
             try
             {
                 UIntPtr result;
@@ -215,6 +238,70 @@ namespace WinSelectionColor
             catch { }
 
             return regSuccess;
+        }
+
+        public static void ApplyDwmAccentColor(Color c)
+        {
+            try
+            {
+                // DWM AccentColor is ABGR: 0xFFBBGGRR
+                uint abgr = 0xFF000000u | ((uint)c.B << 16) | ((uint)c.G << 8) | (uint)c.R;
+                // DWM ColorizationColor is ARGB: 0xC4RRGGBB
+                uint argb = 0xC4000000u | ((uint)c.R << 16) | ((uint)c.G << 8) | (uint)c.B;
+
+                using (RegistryKey dwm = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM", true))
+                {
+                    if (dwm != null)
+                    {
+                        dwm.SetValue("AccentColor", unchecked((int)abgr), RegistryValueKind.DWord);
+                        dwm.SetValue("ColorizationColor", unchecked((int)argb), RegistryValueKind.DWord);
+                        dwm.SetValue("ColorizationAfterglow", unchecked((int)argb), RegistryValueKind.DWord);
+                    }
+                }
+
+                using (RegistryKey acc = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Accent", true))
+                {
+                    if (acc != null)
+                    {
+                        Color darker = Color.FromArgb((int)(c.R * 0.82), (int)(c.G * 0.82), (int)(c.B * 0.82));
+                        uint abgrDark = 0xFF000000u | ((uint)darker.B << 16) | ((uint)darker.G << 8) | (uint)darker.R;
+
+                        acc.SetValue("AccentColorMenu", unchecked((int)abgr), RegistryValueKind.DWord);
+                        acc.SetValue("StartColorMenu", unchecked((int)abgrDark), RegistryValueKind.DWord);
+                        acc.SetValue("AccentPalette", GenerateAccentPalette(c), RegistryValueKind.Binary);
+                    }
+                }
+
+                try
+                {
+                    DwmSetColorizationColor(argb, false);
+                }
+                catch { }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("ApplyDwmAccentColor error: " + ex.Message);
+            }
+        }
+
+        public static byte[] GenerateAccentPalette(Color c)
+        {
+            // 8 colors x 4 bytes each = 32 bytes (R, G, B, 0)
+            byte[] palette = new byte[32];
+            double[] factors = new double[] { 1.45, 1.30, 1.15, 1.00, 0.80, 0.60, 0.40, 1.10 };
+
+            for (int i = 0; i < 8; i++)
+            {
+                int r = Math.Max(0, Math.Min(255, (int)(c.R * factors[i])));
+                int g = Math.Max(0, Math.Min(255, (int)(c.G * factors[i])));
+                int b = Math.Max(0, Math.Min(255, (int)(c.B * factors[i])));
+
+                palette[i * 4 + 0] = (byte)r;
+                palette[i * 4 + 1] = (byte)g;
+                palette[i * 4 + 2] = (byte)b;
+                palette[i * 4 + 3] = 0;
+            }
+            return palette;
         }
 
         public static bool RestartExplorer()

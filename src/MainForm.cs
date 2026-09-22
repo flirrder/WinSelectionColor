@@ -39,6 +39,7 @@ namespace WinSelectionColor
         private TextBox _txtHex;
         private CheckBox _chkAutoTextContrast;
         private CheckBox _chkAutoBorder;
+        private CheckBox _chkSyncDwmAccent;
 
         // Action Buttons
         private Button _btnApply;
@@ -240,7 +241,7 @@ namespace WinSelectionColor
             _chkAutoTextContrast.Checked = true;
             _chkAutoTextContrast.AutoSize = false;
             _chkAutoTextContrast.ForeColor = ClrTextPrimary;
-            _chkAutoTextContrast.SetBounds(16, 138, 275, 24);
+            _chkAutoTextContrast.SetBounds(16, 136, 275, 24);
             _chkAutoTextContrast.CheckedChanged += (s, e) => UpdatePreview();
             cardSettings.Controls.Add(_chkAutoTextContrast);
 
@@ -249,11 +250,21 @@ namespace WinSelectionColor
             _chkAutoBorder.Checked = true;
             _chkAutoBorder.AutoSize = false;
             _chkAutoBorder.ForeColor = ClrTextPrimary;
-            _chkAutoBorder.SetBounds(308, 138, 295, 24);
+            _chkAutoBorder.SetBounds(308, 136, 295, 24);
             _chkAutoBorder.CheckedChanged += (s, e) => UpdatePreview();
             cardSettings.Controls.Add(_chkAutoBorder);
 
-            y += 190;
+            _chkSyncDwmAccent = new CheckBox();
+            _chkSyncDwmAccent.Text = "🎨 Также применить как системный акцент Windows (Пуск, Панель задач, DWM)";
+            _chkSyncDwmAccent.Checked = false;
+            _chkSyncDwmAccent.AutoSize = false;
+            _chkSyncDwmAccent.ForeColor = Color.FromArgb(220, 220, 235);
+            _chkSyncDwmAccent.SetBounds(16, 168, 585, 24);
+            cardSettings.Controls.Add(_chkSyncDwmAccent);
+
+            // Card 3 height accommodates 3 rows of options
+            cardSettings.Height = 205;
+            y += 217;
 
             // --- Card 4: Применение и системные действия ---
             Panel cardActions = CreateCardPanel(20, y, 620, 122);
@@ -757,6 +768,7 @@ namespace WinSelectionColor
             // Sync final values
             _currentSettings.Hilight = Color.FromArgb((int)_numRed.Value, (int)_numGreen.Value, (int)_numBlue.Value);
             _currentSettings.MenuHilight = _currentSettings.Hilight;
+            _currentSettings.SyncDwmAccent = _chkSyncDwmAccent.Checked;
 
             if (_chkAutoBorder.Checked)
                 _currentSettings.HotTrackingColor = ColorRegistry.GenerateBorderColor(_currentSettings.Hilight);
@@ -767,9 +779,10 @@ namespace WinSelectionColor
             bool ok = ColorRegistry.ApplySettings(_currentSettings);
             if (ok)
             {
-                ShowStatus("✔ Новый цвет успешно записан в систему! Для рамки на Рабочем столе нажмите «Перезапустить Проводник».", ClrSuccess);
+                string extraMsg = _chkSyncDwmAccent.Checked ? " и акцент системы" : "";
+                ShowStatus("✔ Цвет выделения" + extraMsg + " успешно применен! Для рамки на Рабочем столе нажмите «Перезапустить Проводник».", ClrSuccess);
                 MessageBox.Show(this,
-                    "Цвет выделения успешно применен в реестре и системных окнах!\n\n" +
+                    "Цвет выделения" + extraMsg + " успешно применен!\n\n" +
                     "Обратите внимание: чтобы рамка выделения на самом Рабочем столе и в папках Проводника сразу приняла новый цвет, нажмите кнопку «Перезапустить Проводник» (занимает 1 секунду).",
                     "Цвет применен", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -802,6 +815,7 @@ namespace WinSelectionColor
                 "Сброс по умолчанию", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
                 var def = new SelectionColorSettings();
+                def.SyncDwmAccent = _chkSyncDwmAccent.Checked;
                 SetColorToUi(def.Hilight);
                 ColorRegistry.ApplySettings(def);
                 ShowStatus("Восстановлен стандартный цвет Windows 10. Нажмите «Перезапустить Проводник».", ClrSuccess);

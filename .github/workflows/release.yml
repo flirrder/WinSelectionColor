@@ -1,0 +1,57 @@
+name: Build and Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build WinSelectionColor.exe
+        shell: cmd
+        run: |
+          call build.bat
+
+      - name: Verify executable exists
+        shell: pwsh
+        run: |
+          if (!(Test-Path "WinSelectionColor.exe")) {
+            throw "WinSelectionColor.exe was not created!"
+          }
+          $size = (Get-Item "WinSelectionColor.exe").Length
+          Write-Host "Binary built successfully! Size: $size bytes"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: "WinSelectionColor ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+          files: WinSelectionColor.exe
+          body: |
+            ## WinSelectionColor ${{ github.ref_name }} 🎨
+            
+            Легковесная (~38 КБ), портативная утилита для изменения цвета системного выделения в Windows 10/11 с пипеткой под цвет обоев и синхронизацией системного акцента Windows.
+            
+            ### Что нового в v1.0.0:
+            - 🔍 **Экранная пипетка со встроенной лупой**: увеличение 11x11 пикселей с перекрестием для точного выбора цвета в любой точке экрана.
+            - 🖼️ **Автоматическая палитра из обоев**: мгновенное считывание доминирующих цветов рабочего стола в один клик.
+            - 👁️ **Предпросмотр (Live Preview)**: реалистичная демонстрация рамки на рабочем столе и выделенного текста.
+            - 🌗 **Авто-контраст текста**: автоматический подбор белого или черного шрифта для идеальной читаемости.
+            - 🎨 **Синхронизация с системным акцентом Windows**: единый цвет для рамки выделения, меню Пуск, панели задач и окон (DWM).
+            - 🔄 **Перезапуск Проводника в 1 клик**: моментальное применение изменений без перезагрузки ПК.
+            - ↩️ **Сброс к цветам по умолчанию**: быстрый возврат к оригинальному синему цвету Windows 10 (`#0078D7`).
+            
+            ### Как запустить:
+            Просто скачайте файл `WinSelectionColor.exe` ниже и запустите. Установка не требуется.
