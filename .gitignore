@@ -8,6 +8,7 @@ obj/
 
 # Local backup & user settings
 selection_color_backup.ini
+push_to_github.bat
 *.bak
 *.local
 
