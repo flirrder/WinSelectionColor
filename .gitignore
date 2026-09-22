@@ -1,0 +1,27 @@
+# Build outputs
+*.exe
+*.dll
+*.pdb
+*.obj
+bin/
+obj/
+
+# Local backup & user settings
+selection_color_backup.ini
+*.bak
+*.local
+
+# Visual Studio & IDEs
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Operating System Files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
